@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+      "outDir": "./dist",
+      "rootDir": "./src",
+  
+      "moduleResolution": "node"
+    }, // other options here
+    "include": ["./src/**/*.ts"]
+  }
+  
