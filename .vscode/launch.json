@@ -13,13 +13,14 @@
                 "start","--inspect"
             ],
             "outputCapture": "std"
-            // "port": 3000 // Uncomment and modify this line if your application runs on a specific port
-        },
+         },
         {
             "type": "node",
             "request": "launch",
             "name": "Jest All",
-            "program": "${workspaceFolder}/node_modules/.bin/jest",
+
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run-script", "test"],
             "args": ["--runInBand"],
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",

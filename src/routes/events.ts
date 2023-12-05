@@ -2,6 +2,7 @@
 import eventsController from '../controllers/events-controller';
 const express = require('express');
 const router = express.Router();
+import { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { param, } from 'express-validator';
 import { IEvent } from '../models/event';
@@ -20,24 +21,22 @@ router.use(
     max: 100, // Limit each IP to 100 requests per windowMs
   })
 );
-router.post('/events', validateScheduleEvent, async (req, res) => {
+router.post('/events/:eventId?',validateScheduleEvent, async (req, res: Response) => {
   try {
     const eventData: IEvent = req.validatedData;
     const result = await eventsController.scheduleEvent(eventData);
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(error.status).json({ message: error.message });
   }
 
 })
-router.get('/events',validateGetEvents, async (req, res) => {
+router.get('/events', validateGetEvents, async (req, res) => {
   try {
     const result = await eventsController.getEvents(req.validatedData);
     res.status(result.status).json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' })
+    res.status(error.status).json({ message: error.message });
   }
 });
 
@@ -46,8 +45,7 @@ router.post('/events/batch', validateBatchOperations, async (req, res) => {
     const result: IAPIRes = await eventsController.batchOperations(req.validatedData);
     return res.status(result.status).json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(error.status).json({ message: error.message });
   }
 });
 
@@ -56,8 +54,7 @@ router.get('/events/:eventId', validateGetEventById, async (req, res) => {
     const result = await eventsController.getEventById(req.validatedData.eventId);
     res.status(result.status).json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(error.status).json({ message: error.message });
   }
 });
 
@@ -66,18 +63,17 @@ router.put('/events/:eventId', validateUpdateEvent, async (req, res) => {
     const result = await eventsController.updateEvent(req.validatedData.eventId, req.validatedData.data);
     res.status(result.status).json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(error.status).json({ message: error.message });
   }
 });
 
 router.delete('/events/:eventId', param('eventId').isMongoId(), async (req, res) => {
   try {
-    const result = await eventsController.deleteEvent(req.validatedData.eventId);
+    const eventId = req.params.eventId;
+    const result = await eventsController.deleteEvent(eventId);
     res.status(result.status).json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(error.status).json({ message: error.message });
   }
 });
 
@@ -86,8 +82,8 @@ router.get('/jobs', async (req, res) => {
     const jobs = await reminderService.getAllJobs();
     res.status(200).json(jobs);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.log(error);
+    res.status(error.status).json({ message: error.message });
   }
 });
 

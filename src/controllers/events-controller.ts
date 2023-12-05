@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { EventModel, IBatchData, IEvent, validateEvent, validatePartialEvent } from '../models/event';
 import reminderService from '../services/reminders-service';
 import { APIErr, APIRes, APIResBase, APIStatus, IAPIRes } from '../utils/custom-error';
@@ -18,6 +19,7 @@ export class EventsController {
   }
 
   private handleAPIError(error) {
+    console.log(error);
     if (error instanceof APIErr) {
       throw error;
     }
@@ -26,19 +28,20 @@ export class EventsController {
 
   async scheduleEvent(event: IEvent): Promise<IAPIRes> {
     try {
+      
       validateEvent(event);
       const existingEvent = await EventModel.findOne({
         'eventSchedule.date': event.eventSchedule.date,
         'eventSchedule.time': event.eventSchedule.time,
         venue: event.venue,
       });
-
       if (existingEvent) {
         throw new APIErr(APIStatus.BAD_REQUEST, 'Another event already scheduled in the same venue at the same time');
       }
 
+      await reminderService.scheduleReminder(event);
+      event.jobStarted = true;
       const newEvent = await EventModel.create(event);
-      await reminderService.scheduleReminder(newEvent._id);
       return new APIRes(APIStatus.OK, 'Event scheduled successfully', newEvent);
     } catch (error) {
       this.handleAPIError(error);
@@ -52,16 +55,17 @@ export class EventsController {
         date: { 'eventSchedule.date': 1, 'eventSchedule.time': 1 },
         creationTime: { createdAt: 1 },
       };
-  
+
       const allowedSortOptions = Object.keys(sortOptionsMap);
-  
+
       if (sortBy && !allowedSortOptions.includes(sortBy)) {
         throw new APIErr(APIStatus.BAD_REQUEST, `Invalid sort option. Allowed options are: ${allowedSortOptions.join(', ')}`);
       }
-  
-      const query: any = { venue, location };
+      const query: any = {};
+      if (venue) query.venue = venue;
+      if (location) query.location = location;
       const sortOptions = sortBy ? sortOptionsMap[sortBy] : {}
-  
+
       const events = await EventModel.find(query).sort(sortOptions);
       return new APIRes(APIStatus.OK, 'Events retrieved successfully', events);
     } catch (error) {
@@ -117,11 +121,12 @@ export class EventsController {
 
 
   private batchHandleError(operation: string, itemId: string, error: Error, errors: string[]) {
+    console.log(error);
     const errorMessage = `Error ${operation} for item with ID ${itemId}: ${error.message}`;
-    console.error(errorMessage);
+    console.log(errorMessage);
     errors.push(errorMessage);
   }
-  
+
   private batchHandleAPIError(error: Error, errors: string[]) {
     if (error instanceof APIErr) {
       throw error;

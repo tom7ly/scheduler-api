@@ -1,6 +1,8 @@
-import { EventModel } from '../models/event';
+import mongoose, { mongo } from 'mongoose';
+import { EventModel, IEvent, validateEvent } from '../models/event';
 import { APIErr, APIRes, APIStatus, IAPIRes } from '../utils/custom-error';
 const Queue = require('bee-queue');
+const redisHost = process.env.RUNNING_IN_DOCKER ? "redis" : "localhost";
 
 /**
  * [PATH] src/services/reminders-service.ts
@@ -9,10 +11,16 @@ const Queue = require('bee-queue');
 
 
 class ReminderService {
-  private queue: typeof Queue;
+  public queue: typeof Queue;
 
   constructor() {
-    this.queue = new Queue('reminders');
+    this.queue = new Queue('reminders', {
+      redis: {
+        host: redisHost,
+        port: 6379
+      }
+    }
+    );
     this.setupQueueErrorHandling();
     this.processReminders();
   }
@@ -22,27 +30,31 @@ class ReminderService {
   }
 
   private handleAPIError(error: Error) {
+    console.log(error);
     if (error instanceof APIErr) {
       throw error;
     }
     throw new APIErr(APIStatus.INTERNAL_SERVER_ERROR, "Internal server error");
   }
 
-  async scheduleReminder(eventId: string): Promise<IAPIRes> {
+  async scheduleReminder(event: IEvent): Promise<IAPIRes> {
     try {
-      const event = await EventModel.findById(eventId);
-      if (!event) {
-        throw new APIErr(APIStatus.NOT_FOUND, `Event with ID ${eventId} not found`);
+      validateEvent(event);
+      const foundEvent = await EventModel.findById(event._id);
+      const jobId = new mongoose.Types.ObjectId().toString();
+      if (foundEvent) {
+        throw new APIErr(APIStatus.NOT_FOUND, `Event with ID ${event._id} not found`);
       }
-
-      this.cancelReminder(eventId);
+      if (this.queue.getJob(jobId) !== null) {
+        this.cancelReminder(jobId);
+      }
 
       const reminderTime = new Date(event.eventSchedule.date + ' ' + event.eventSchedule.time);
       reminderTime.setMinutes(reminderTime.getMinutes() - 30);
 
-      const job = this.queue.createJob({ eventId }).delayUntil(reminderTime);
+      const job = this.queue.createJob({ jobId }).delayUntil(reminderTime);
       await job.save();
-      return new APIRes(APIStatus.OK, `Reminder scheduled for event with ID ${eventId}`);
+      return new APIRes(APIStatus.OK, `Reminder scheduled for event`);
     } catch (error) {
       this.handleAPIError(error);
     }

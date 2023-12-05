@@ -42,8 +42,10 @@ export class APIErr extends Error implements IAPIRes {
   data?: any;
   errors?: string[];
 
-  constructor(status: number, message: string, data?: any, errors?: string[]) {
+  constructor(status: number, message: string='', data?: any, errors?: string[]) {
     super(message);
+    this.name = 'APIErr';
+    Object.setPrototypeOf(this, new.target.prototype);
     this.status = status;
     this.message = message;
     this.data = data;

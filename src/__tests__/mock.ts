@@ -1,4 +1,5 @@
 import { IBatchData, IEvent } from "../models/event";
+import { APIErr, APIStatus } from "../utils/custom-error";
 
 /**
  * [PATH] src/__tests__/mock.ts
@@ -101,3 +102,10 @@ export const getMockBatchData = (n: number = 5): IBatchData => {
   }
   return mockBatchData;
 };
+export const sortOptionsMap = {
+  popularity: { participants: -1 },
+  date: { 'eventSchedule.date': 1, 'eventSchedule.time': 1 },
+  creationTime: { createdAt: 1 },
+};
+
+export const allowedSortOptions = Object.keys(sortOptionsMap);

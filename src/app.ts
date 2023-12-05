@@ -4,12 +4,10 @@ import bodyParser from 'body-parser';
 import eventRoutes from './routes/events';
 const cors = require('cors');
 const express = require('express');
-// Initialize Express app
 const app = express();
 const port = process.env.PORT || 8000;
 
-// MongoDB Connection
-const mongoURI = 'mongodb://localhost:27017/schedule-app';
+const  mongoURI = process.env.RUNNING_IN_DOCKER ? "mongodb://mongo:27017" : "mongodb://localhost:27017";
 mongoose.connect(mongoURI)
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));

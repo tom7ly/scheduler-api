@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { EventsController } from '../controllers/events-controller';
-import { getMockEvents, getMockResponse, getMockRequest, getMockedEvent, getMockQuery } from './mock';
+import { getMockEvents, getMockResponse, getMockRequest, getMockedEvent, getMockQuery, allowedSortOptions } from './mock';
 import reminderService from '../services/reminders-service';
 import { EventModel, IEvent } from '../models/event';
 import { APIErr, APIRes, APIStatus } from '../utils/custom-error';
@@ -30,7 +30,9 @@ describe('EventsController', () => {
     jest.spyOn(console, 'log').mockImplementation(() => { });
     jest.clearAllMocks();
   });
-
+  afterEach(async () => {
+    await reminderService.queue.close();
+  });
   describe('scheduleEvent', () => {
     it('should schedule an event successfully', async () => {
       const mockEvent: IEvent = getMockedEvent();
@@ -44,7 +46,7 @@ describe('EventsController', () => {
       expect(result.status).toEqual(APIStatus.OK);
       expect(result.message).toEqual('Event scheduled successfully');
       expect(result.data).toEqual(mockEvent);
-      expect(reminderService.scheduleReminder).toHaveBeenCalledWith(mockEvent._id);
+      expect(reminderService.scheduleReminder).toHaveBeenCalledWith(mockEvent);
     });
 
     it('should handle failure when scheduling a reminder', async () => {
@@ -53,16 +55,11 @@ describe('EventsController', () => {
       scheduleReminderMock.mockRejectedValue(new APIErr(APIStatus.INTERNAL_SERVER_ERROR, 'Error scheduling reminder.'));
 
       await expect(eventsController.scheduleEvent(mockEvent)).rejects.toThrow('Error scheduling reminder.');
-      expect(reminderService.scheduleReminder).toHaveBeenCalledWith(mockEvent._id);
+      expect(reminderService.scheduleReminder).toHaveBeenCalledWith(mockEvent);
     });
   });
 
   describe('getEvents', () => {
-    beforeEach(() => {
-      jest.clearAllMocks();
-      jest.clearAllMocks();
-
-    });
     it('should retrieve events successfully', async () => {
       const mockQuery: Request = getMockQuery();
       EventModel.find = jest.fn().mockImplementation(() => {
@@ -124,12 +121,7 @@ describe('EventsController', () => {
 
     it('should handle unknown sortBy values', async () => {
       const mockQuery: Request = getMockQuery({ sortBy: 'unknownValue' });
-      const result = await eventsController.getEvents(mockQuery);
-
-      expect(result.status).toEqual(APIStatus.OK);
-      expect(result.message).toEqual('Events retrieved successfully');
-      expect(result.data).toEqual(mockEvents);
-      expect(EventModel.find).toHaveBeenCalledWith({ venue: mockQuery.venue, location: mockQuery.location });
+      await expect(eventsController.getEvents(mockQuery)).rejects.toThrow( `Invalid sort option. Allowed options are: ${allowedSortOptions.join(', ')}`);
     });
 
 
