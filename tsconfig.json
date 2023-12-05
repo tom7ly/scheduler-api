@@ -2,7 +2,7 @@
     "compilerOptions": {
       "outDir": "./dist",
       "rootDir": "./src",
-  
+      "esModuleInterop": true,
       "moduleResolution": "node"
     }, // other options here
     "include": ["./src/**/*.ts"]

@@ -1,54 +1,66 @@
-// services/reminder-service.ts
-import { EventModel, IEvent } from '../models/event';
+import { EventModel } from '../models/event';
+import { APIErr, APIRes, APIStatus, IAPIRes } from '../utils/custom-error';
 const Queue = require('bee-queue');
 
-interface RemindersErrorInterface {
-  status: 'error';
-  message: string;
-}
+/**
+ * [PATH] src/services/reminders-service.ts
+ * This file contains the logic for the reminders service.
+ */
+
 
 class ReminderService {
   private queue: typeof Queue;
 
   constructor() {
     this.queue = new Queue('reminders');
-    this.queue.on('error', (error) => console.error(`Queue error: ${error}`));
+    this.setupQueueErrorHandling();
     this.processReminders();
   }
 
-  async scheduleReminder(eventId: string): Promise<void> {
+  private setupQueueErrorHandling() {
+    this.queue.on('error', (error) => this.handleAPIError(error));
+  }
+
+  private handleAPIError(error: Error) {
+    if (error instanceof APIErr) {
+      throw error;
+    }
+    throw new APIErr(APIStatus.INTERNAL_SERVER_ERROR, "Internal server error");
+  }
+
+  async scheduleReminder(eventId: string): Promise<IAPIRes> {
     try {
       const event = await EventModel.findById(eventId);
       if (!event) {
-        console.error(`Event with ID ${eventId} not found for scheduling reminder.`);
-        throw { status: 'error', message: `Event with ID ${eventId} not found for scheduling reminder.` };
+        throw new APIErr(APIStatus.NOT_FOUND, `Event with ID ${eventId} not found`);
       }
+
+      this.cancelReminder(eventId);
 
       const reminderTime = new Date(event.eventSchedule.date + ' ' + event.eventSchedule.time);
       reminderTime.setMinutes(reminderTime.getMinutes() - 30);
 
       const job = this.queue.createJob({ eventId }).delayUntil(reminderTime);
       await job.save();
+      return new APIRes(APIStatus.OK, `Reminder scheduled for event with ID ${eventId}`);
     } catch (error) {
-      console.error(`Error scheduling reminder: ${error}`);
-      throw { status: 'error', message: 'Error scheduling reminder.' };
+      this.handleAPIError(error);
     }
   }
 
-  async cancelReminder(eventId: string): Promise<any> {
+  async cancelReminder(eventId: string): Promise<IAPIRes> {
     try {
       const job = await this.queue.getJob(eventId);
       if (job) {
         await job.remove();
       }
-      return { status: 'success' };
+      return new APIRes(APIStatus.OK, `Reminder canceled for event with ID ${eventId}`);
     } catch (error) {
-      console.error(`Error canceling reminder: ${error}`);
-      throw { status: 'error', message: 'Error canceling reminder.' };
+      this.handleAPIError(error);
     }
   }
 
-  async getAllJobs(): Promise<any> {
+  async getAllJobs(): Promise<IAPIRes> {
     try {
       const jobTypes = ['waiting', 'active', 'succeeded', 'failed', 'delayed'];
       const allJobs = [];
@@ -57,17 +69,16 @@ class ReminderService {
         const jobs = await this.queue.getJobs(type);
         allJobs.push(...jobs);
       }
-      return allJobs;
+
+      return new APIRes(APIStatus.OK, 'Jobs retrieved successfully', allJobs);
     } catch (error) {
-      console.error(`Error getting jobs: ${error}`);
-      throw { status: 'error', message: 'Error getting jobs.' };
+      this.handleAPIError(error);
     }
   }
 
-  processReminders(): void {
+  private processReminders(): void {
     this.queue.process(async (job) => {
       const { eventId } = job.data;
-      
       console.log(`Reminder sent for event with ID ${eventId}`);
     });
   }

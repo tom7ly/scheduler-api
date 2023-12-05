@@ -4,10 +4,14 @@ module.exports = {
     preset: 'ts-jest',
     testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$',
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+    testPathIgnorePatterns: [
+      "/node_modules/",
+      "/src/__tests__/mock.ts"
+    ],
     globals: {
-      'ts-jest': {
-        tsconfig: 'path/to/your/tsconfig.json',
-      },
+      "transform": {
+        "^.+\\.ts?$": ["ts-jest", { tsconfig: 'tsconfig.json' }]
+      }
     },
   };
   

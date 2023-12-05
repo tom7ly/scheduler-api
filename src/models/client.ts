@@ -1,5 +1,9 @@
-// models/client.ts
 import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * [PATH] src/models/client.ts
+ * This file contains the client model which represents a client connected to the server via WebSocket.
+ */
 
 export interface IClient {
   id: string;
