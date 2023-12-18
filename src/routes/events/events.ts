@@ -1,14 +1,14 @@
 
-import eventsController from '../controllers/events-controller';
+import eventsController from '../../controllers/events-controller';
 const express = require('express');
 const router = express.Router();
 import { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { param, } from 'express-validator';
-import { IEvent } from '../models/event';
-import { IAPIRes } from '../utils/custom-error';
-import reminderService from '../services/reminders-service';
-import { validateBatchOperations, validateGetEventById, validateGetEvents, validateScheduleEvent, validateUpdateEvent } from './validators/events.validator';
+import { IEvent } from '../../models/event';
+import { IAPIRes } from '../../utils/custom-error';
+import reminderService from '../../services/reminders-service';
+import { validateBatchOperations, validateGetEventById, validateGetEvents, validateScheduleEvent, validateUpdateEvent } from './events.validator';
 
 /**
  * [PATH] src/routes/events.ts
@@ -21,7 +21,7 @@ router.use(
     max: 100, // Limit each IP to 100 requests per windowMs
   })
 );
-router.post('/events/:eventId?',validateScheduleEvent, async (req, res: Response) => {
+router.post('/events',validateScheduleEvent, async (req, res: Response) => {
   try {
     const eventData: IEvent = req.validatedData;
     const result = await eventsController.scheduleEvent(eventData);
@@ -73,16 +73,6 @@ router.delete('/events/:eventId', param('eventId').isMongoId(), async (req, res)
     const result = await eventsController.deleteEvent(eventId);
     res.status(result.status).json(result);
   } catch (error) {
-    res.status(error.status).json({ message: error.message });
-  }
-});
-
-router.get('/jobs', async (req, res) => {
-  try {
-    const jobs = await reminderService.getAllJobs();
-    res.status(200).json(jobs);
-  } catch (error) {
-    console.log(error);
     res.status(error.status).json({ message: error.message });
   }
 });

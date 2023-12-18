@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { EventModel, IBatchData, IEvent, validateEvent, validatePartialEvent } from '../models/event';
 import reminderService from '../services/reminders-service';
 import { APIErr, APIRes, APIResBase, APIStatus, IAPIRes } from '../utils/custom-error';
+import { IReminderJob, JobStatus } from '../models/reminder-job';
 
 /**
  * [PATH] src/controllers/events-controller.ts
@@ -28,20 +29,22 @@ export class EventsController {
 
   async scheduleEvent(event: IEvent): Promise<IAPIRes> {
     try {
-      
       validateEvent(event);
       const existingEvent = await EventModel.findOne({
-        'eventSchedule.date': event.eventSchedule.date,
-        'eventSchedule.time': event.eventSchedule.time,
+        eventSchedule: event.eventSchedule,
+        location: event.location,
         venue: event.venue,
       });
       if (existingEvent) {
-        throw new APIErr(APIStatus.BAD_REQUEST, 'Another event already scheduled in the same venue at the same time');
+        throw new APIErr(APIStatus.BAD_REQUEST, 'Another event already scheduled in the same location and venue at the same time');
       }
-
-      await reminderService.scheduleReminder(event);
-      event.jobStarted = true;
       const newEvent = await EventModel.create(event);
+      try {
+        await reminderService.scheduleReminder(newEvent._id);
+      } catch (error) {
+        await EventModel.deleteOne({ _id: newEvent._id });
+        throw error; // Re-throw the error so it can be handled by the outer catch block
+      }
       return new APIRes(APIStatus.OK, 'Event scheduled successfully', newEvent);
     } catch (error) {
       this.handleAPIError(error);
@@ -106,10 +109,19 @@ export class EventsController {
 
   async deleteEvent(eventId: string): Promise<IAPIRes> {
     try {
-      if (!eventId) {
-        throw new APIErr(APIStatus.BAD_REQUEST, "Event ID is required");
+
+      const event = await EventModel.findById(eventId);
+      if (!event) {
+        throw new APIErr(APIStatus.NOT_FOUND, 'Event not found');
       }
+
       const deletedEvent = await EventModel.findByIdAndDelete(eventId);
+      const reminder: IReminderJob = await reminderService.getReminderJob('eventId', eventId);
+      if (reminder) {
+        await reminderService.cancelReminder(reminder).catch((error) => {
+          console.log('Error canceling reminder for event', error);
+        });
+      }
       if (!deletedEvent) {
         throw new APIErr(APIStatus.NOT_FOUND, 'Event not found');
       }
